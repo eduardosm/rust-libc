@@ -145,9 +145,39 @@ fn main() {
     // Avoid unnecessary re-building.
     println!("cargo:rerun-if-changed=build.rs");
 
+    if std::fs::exists("../target/src-hotfix").unwrap() {
+        std::fs::remove_dir_all("../target/src-hotfix").unwrap();
+    }
+
+    // FIXME(ctest): ctest2 cannot parse `crate::` in paths, so replace them with `::`
+    let re = regex::bytes::Regex::new(r"(?-u:\b)crate::").unwrap();
+    copy_dir_hotfix(
+        Path::new("../src"),
+        Path::new("../target/src-hotfix"),
+        &re,
+        b"::",
+    );
+
     do_cc();
     do_ctest();
     do_semver();
+}
+
+fn copy_dir_hotfix(src: &Path, dst: &Path, regex: &regex::bytes::Regex, replace: &[u8]) {
+    std::fs::create_dir(&dst).unwrap();
+    for entry in src.read_dir().unwrap() {
+        let entry = entry.unwrap();
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_dir_hotfix(&src_path, &dst_path, regex, replace);
+        } else {
+            // Replace "crate::" with "::"
+            let src_data = std::fs::read(&src_path).unwrap();
+            let dst_data = regex.replace_all(&src_data, b"::");
+            std::fs::write(&dst_path, &dst_data).unwrap();
+        }
+    }
 }
 
 macro_rules! headers {
@@ -442,7 +472,7 @@ fn test_apple(target: &str) {
         "uuid_t" | "vol_capabilities_set_t" => true,
         _ => false,
     });
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_openbsd(target: &str) {
@@ -607,7 +637,7 @@ fn test_openbsd(target: &str) {
         }
     });
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_windows(target: &str) {
@@ -729,7 +759,7 @@ fn test_windows(target: &str) {
 
     cfg.skip_fn(|_| false);
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_redox(target: &str) {
@@ -779,7 +809,7 @@ fn test_redox(target: &str) {
         "wchar.h",
     }
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_solarish(target: &str) {
@@ -1054,7 +1084,7 @@ fn test_solarish(target: &str) {
         }
     });
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_netbsd(target: &str) {
@@ -1267,7 +1297,7 @@ fn test_netbsd(target: &str) {
         }
     });
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_dragonflybsd(target: &str) {
@@ -1490,7 +1520,7 @@ fn test_dragonflybsd(target: &str) {
         (struct_ == "sigevent" && field == "sigev_notify_thread_id")
     });
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_wasi(target: &str) {
@@ -1597,7 +1627,7 @@ fn test_wasi(target: &str) {
     // doesn't support sizeof.
     cfg.skip_field(|s, field| s == "dirent" && field == "d_name");
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_android(target: &str) {
@@ -2090,7 +2120,7 @@ fn test_android(target: &str) {
         }
     });
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 
     test_linux_like_apis(target);
 }
@@ -2746,7 +2776,7 @@ fn test_freebsd(target: &str) {
         });
     }
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_emscripten(target: &str) {
@@ -2983,7 +3013,7 @@ fn test_emscripten(target: &str) {
         ].contains(&field))
     });
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_neutrino(target: &str) {
@@ -3233,7 +3263,7 @@ fn test_neutrino(target: &str) {
 
     cfg.skip_static(move |name| (name == "__dso_handle"));
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_vxworks(target: &str) {
@@ -3341,7 +3371,7 @@ fn test_vxworks(target: &str) {
         _ => false,
     });
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
 
 fn test_linux(target: &str) {
@@ -4471,7 +4501,7 @@ fn test_linux(target: &str) {
         _ => false,
     });
 
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 
     test_linux_like_apis(target);
 }
@@ -4498,7 +4528,7 @@ fn test_linux_like_apis(target: &str) {
         })
         .skip_const(|_| true)
         .skip_struct(|_| true);
-        cfg.generate("../src/lib.rs", "linux_strerror_r.rs");
+        cfg.generate("../target/src-hotfix/lib.rs", "linux_strerror_r.rs");
     }
 
     if linux || android || emscripten {
@@ -4528,7 +4558,7 @@ fn test_linux_like_apis(target: &str) {
                 t => t.to_string(),
             });
 
-        cfg.generate("../src/lib.rs", "linux_fcntl.rs");
+        cfg.generate("../target/src-hotfix/lib.rs", "linux_fcntl.rs");
     }
 
     if linux || android {
@@ -4552,7 +4582,7 @@ fn test_linux_like_apis(target: &str) {
                 t if is_union => format!("union {}", t),
                 t => t.to_string(),
             });
-        cfg.generate("../src/lib.rs", "linux_termios.rs");
+        cfg.generate("../target/src-hotfix/lib.rs", "linux_termios.rs");
     }
 
     if linux || android {
@@ -4580,7 +4610,7 @@ fn test_linux_like_apis(target: &str) {
                 t if is_union => format!("union {}", t),
                 t => t.to_string(),
             });
-        cfg.generate("../src/lib.rs", "linux_ipv6.rs");
+        cfg.generate("../target/src-hotfix/lib.rs", "linux_ipv6.rs");
     }
 
     if linux || android {
@@ -4602,7 +4632,7 @@ fn test_linux_like_apis(target: &str) {
                 "Elf64_Phdr" | "Elf32_Phdr" => false,
                 _ => true,
             });
-        cfg.generate("../src/lib.rs", "linux_elf.rs");
+        cfg.generate("../target/src-hotfix/lib.rs", "linux_elf.rs");
     }
 
     if linux || android {
@@ -4617,7 +4647,7 @@ fn test_linux_like_apis(target: &str) {
             })
             .skip_struct(|_| true)
             .skip_type(|_| true);
-        cfg.generate("../src/lib.rs", "linux_if_arp.rs");
+        cfg.generate("../target/src-hotfix/lib.rs", "linux_if_arp.rs");
     }
 }
 
@@ -4973,5 +5003,5 @@ fn test_haiku(target: &str) {
             s => s.to_string(),
         }
     });
-    cfg.generate("../src/lib.rs", "main.rs");
+    cfg.generate("../target/src-hotfix/lib.rs", "main.rs");
 }
